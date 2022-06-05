@@ -1,13 +1,18 @@
 import { Typography } from "@mui/material";
+import { useEffect } from "react";
 import "./App.css";
 import ClaimFlexiTime from "./components/ClaimFlexiTime";
 import CurrentFlexiTime from "./components/CurrentFlexiTime";
 import LogFlexiTime from "./components/LogFlexiTIme";
 import { NavBar } from "./components/NavBar";
-import useLogin from "./hooks/useLogin";
+import { useLogin } from "./hooks/useLogin";
 
 export default function App() {
 	const { isSignedIn } = useLogin();
+
+	useEffect(() => {
+		console.log(isSignedIn);
+	}, [isSignedIn]);
 
 	return (
 		<div className="App">

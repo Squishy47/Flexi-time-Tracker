@@ -1,30 +1,39 @@
 import { useEffect, useState } from "react";
-import FlexiTrack from "../contracts/flexi_track";
-import useContract from "./useContract";
+import { singletonHook } from "react-singleton-hook";
+import { useFlexiTimeContract } from "./useFlexiTimeContract";
 
-export default function useFlexiTime() {
+function FlexiTime() {
 	const [flexiTime, setFlexiTime] = useState(0);
 	const [remainingHours, setRemainingHours] = useState(0);
+	const [loading, setLoading] = useState(false);
 
-	const contract = useContract(FlexiTrack);
+	const contract = useFlexiTimeContract();
 
-	const get_flexi_time = async () =>
+	const get_flexi_time = async () => {
+		setLoading(true);
 		setFlexiTime(
 			// @ts-ignore
 			await contract?.get_flexi_time({
 				account_id: "sam4.testnet",
 			})
 		);
+		setLoading(false);
+	};
 
-	const get_remaining_loggable_hours_in_epoch = async () =>
+	const get_remaining_loggable_hours_in_epoch = async () => {
+		setLoading(true);
+
 		setRemainingHours(
 			// @ts-ignore
 			await contract?.get_remaining_loggable_hours_in_epoch({
 				account_id: "sam4.testnet",
 			})
 		);
+		setLoading(false);
+	};
 
 	const set_flexi_time = async (val: number) => {
+		setLoading(true);
 		// @ts-ignore
 		await contract?.log_flexi_time({
 			args: {
@@ -36,6 +45,7 @@ export default function useFlexiTime() {
 	};
 
 	const claim_flexi_time = async (val: number) => {
+		setLoading(true);
 		// @ts-ignore
 		await contract?.claim_flexi_time({
 			args: {
@@ -56,5 +66,17 @@ export default function useFlexiTime() {
 		remainingHours: remainingHours,
 		setFlexiTime: set_flexi_time,
 		claimFlexiTime: claim_flexi_time,
+		loading: loading,
 	};
 }
+
+export const useFlexiTime = singletonHook(
+	{
+		flexiTime: 0,
+		remainingHours: 0,
+		setFlexiTime: async (val: number) => {},
+		claimFlexiTime: async (val: number) => {},
+		loading: false,
+	},
+	FlexiTime
+);

@@ -5,6 +5,9 @@ use near_sdk::{env, near_bindgen, log,PanicOnDefault};
 
 near_sdk::setup_alloc!();
 
+// TODO: make it so can log sub-divisions of an hour. minute resolution??
+// TODO: build interface to log time based on start and end time so i don't have to work it out.
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct FlexiTracker {
@@ -27,7 +30,7 @@ impl FlexiTracker {
     #[init]
     pub fn new() -> Self {
         Self {
-            flexi_time_per_epoch: 12,
+            flexi_time_per_epoch: 6,
             users_tokens: HashMap::new(),
             users_authorized_viewers: HashMap::new(),
         }
@@ -54,7 +57,7 @@ impl FlexiTracker {
         };
 
         if user_tokens.epoch == env::epoch_height() {
-            if self.flexi_time_per_epoch - user_tokens.logged_this_epoch - hours > 0 {
+            if self.flexi_time_per_epoch - user_tokens.logged_this_epoch - hours >= 0 {
                 self.users_tokens.insert(env::signer_account_id(), new_time);
                 return;
             }

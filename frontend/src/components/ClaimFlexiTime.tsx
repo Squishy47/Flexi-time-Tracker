@@ -1,10 +1,17 @@
-import { TextField, Button, Typography } from "@mui/material";
-import { useState } from "react";
-import useFlexiTime from "../hooks/useFlexiTime";
+import { TextField, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import { useFlexiTime } from "../hooks/FlexiTime";
+import LoadingButton from "@mui/lab/LoadingButton";
 
 export default function ClaimFlexiTime() {
-	const { claimFlexiTime } = useFlexiTime();
-	const [tempClaimFlexiTime, setTempClaimFlexiTime] = useState(0);
+	const { claimFlexiTime, loading } = useFlexiTime();
+	const [tempClaimFlexiTime, setTempClaimFlexiTime] = useState("");
+
+	useEffect(() => {
+		if (tempClaimFlexiTime && !loading) {
+			setTempClaimFlexiTime("");
+		}
+	}, [loading]);
 
 	return (
 		<div style={{ display: "flex", flexDirection: "column", width: "25%", boxShadow: "1px 1px 3px #cecece", margin: 10 }}>
@@ -12,10 +19,10 @@ export default function ClaimFlexiTime() {
 				Claim Flexi-time
 			</Typography>
 
-			<TextField id="outlined-basic" label="Claim Flexi-time" variant="outlined" onChange={(e) => setTempClaimFlexiTime(Number(e.target.value))} style={{ margin: 10 }} />
-			<Button variant="contained" color="primary" onClick={() => claimFlexiTime(tempClaimFlexiTime)} style={{ margin: 10, marginTop: 0 }}>
+			<TextField id="outlined-basic" label="Claim Flexi-time" variant="outlined" onChange={(e) => setTempClaimFlexiTime(e.target.value)} style={{ margin: 10 }} value={tempClaimFlexiTime} />
+			<LoadingButton variant="contained" color="primary" onClick={() => claimFlexiTime(Number(tempClaimFlexiTime))} style={{ margin: 10, marginTop: 0 }} loading={loading && tempClaimFlexiTime.length > 0}>
 				Submit
-			</Button>
+			</LoadingButton>
 		</div>
 	);
 }

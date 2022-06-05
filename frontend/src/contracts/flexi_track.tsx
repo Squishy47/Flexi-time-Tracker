@@ -1,3 +1,5 @@
+import { ConnectedWalletAccount, Contract } from "near-api-js";
+
 export interface ContractDetails {
 	title: string;
 	account: string;
@@ -11,5 +13,11 @@ const FlexiTrack: ContractDetails = {
 	viewMethods: ["get_flexi_time", "get_remaining_loggable_hours_in_epoch"],
 	changeMethods: ["claim_flexi_time", "log_flexi_time"],
 };
+
+export const FlexiTimeContract = (account: ConnectedWalletAccount) =>
+	new Contract(account, FlexiTrack.account, {
+		viewMethods: FlexiTrack.viewMethods,
+		changeMethods: FlexiTrack.changeMethods,
+	});
 
 export default FlexiTrack;

@@ -1,5 +1,5 @@
 import { AppBar, Box, Button, Container, IconButton, Toolbar, Typography } from "@mui/material";
-import useLogin from "../hooks/useLogin";
+import { useLogin } from "../hooks/useLogin";
 
 export function NavBar() {
 	const { isSignedIn, signIn, signOut } = useLogin();

@@ -1,5 +1,5 @@
 import { Typography } from "@mui/material";
-import useFlexiTime from "../hooks/useFlexiTime";
+import {useFlexiTime} from "../hooks/FlexiTime";
 
 export default function CurrentFlexiTime() {
 	const { flexiTime, remainingHours } = useFlexiTime();

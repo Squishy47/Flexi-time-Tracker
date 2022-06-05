@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import useWallet from "./useWallet";
+import { singletonHook } from "react-singleton-hook";
 
-export default function useLogin() {
+function Login() {
 	const wallet = useWallet();
 
 	const [isSignedIn, setIsSignedIn] = useState<boolean>(wallet?.isSignedIn() == undefined ? false : wallet.isSignedIn());
@@ -27,3 +28,11 @@ export default function useLogin() {
 		signOut: signOut,
 	};
 }
+
+const init = {
+	isSignedIn: false,
+	signIn: () => {},
+	signOut: () => {},
+};
+
+export const useLogin = singletonHook(init, Login);
