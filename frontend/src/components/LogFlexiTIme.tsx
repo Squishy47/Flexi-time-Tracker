@@ -14,7 +14,7 @@ export default function LogFlexiTime() {
 	}, [loading]);
 
 	return (
-		<div style={{ display: "flex", flexDirection: "column", width: "25%", boxShadow: "1px 1px 3px #cecece", margin: 10 }}>
+		<div style={{ display: "flex", flexDirection: "column", boxShadow: "1px 1px 3px #cecece", margin: 10 }}>
 			<Typography variant="h5" component="h5">
 				Log Flexi-time
 			</Typography>
