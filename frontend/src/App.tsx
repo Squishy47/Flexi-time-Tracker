@@ -20,30 +20,21 @@ export default function App() {
 
 	return (
 		<div className="App">
-			<BrowserRouter>
-				<ResponsiveAppBar />
-				<Routes>
-					<Route
-						index
-						element={
-							<div>
-								{isSignedIn ? (
-									<div>
-										<LogFlexiTime />
-										<ClaimFlexiTime />
-										<CurrentFlexiTime />
-									</div>
-								) : (
-									<Typography variant="h5" component="h5">
-										<div>Login to track flexi-time</div>
-									</Typography>
-								)}
-							</div>
-						}
-					/>
-					<Route path="about" element={<Settings />} />
-				</Routes>
-			</BrowserRouter>
+			<ResponsiveAppBar />
+
+			<div>
+				{isSignedIn ? (
+					<div>
+						<LogFlexiTime />
+						<ClaimFlexiTime />
+						<CurrentFlexiTime />
+					</div>
+				) : (
+					<Typography variant="h5" component="h5">
+						<div>Connect NEAR wallet to track flexi-time</div>
+					</Typography>
+				)}
+			</div>
 		</div>
 	);
 }
