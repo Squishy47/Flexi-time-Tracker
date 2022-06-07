@@ -20,12 +20,12 @@ function FlexiTime() {
 		setLoading(false);
 	};
 
-	const get_remaining_loggable_hours_in_epoch = async () => {
+	const get_remaining_loggable_time_in_epoch = async () => {
 		setLoading(true);
 
 		setRemainingHours(
 			// @ts-ignore
-			await contract?.get_remaining_loggable_hours_in_epoch({
+			await contract?.get_remaining_loggable_time_in_epoch({
 				account_id: "sam4.testnet",
 			})
 		);
@@ -37,11 +37,11 @@ function FlexiTime() {
 		// @ts-ignore
 		await contract?.log_flexi_time({
 			args: {
-				hours: val,
+				minutes: val,
 			},
 		});
 		get_flexi_time();
-		get_remaining_loggable_hours_in_epoch();
+		get_remaining_loggable_time_in_epoch();
 	};
 
 	const claim_flexi_time = async (val: number) => {
@@ -49,16 +49,16 @@ function FlexiTime() {
 		// @ts-ignore
 		await contract?.claim_flexi_time({
 			args: {
-				hours: val,
+				minutes: val,
 			},
 		});
 		get_flexi_time();
-		get_remaining_loggable_hours_in_epoch();
+		get_remaining_loggable_time_in_epoch();
 	};
 
 	useEffect(() => {
 		get_flexi_time();
-		get_remaining_loggable_hours_in_epoch();
+		get_remaining_loggable_time_in_epoch();
 	}, [contract]);
 
 	return {

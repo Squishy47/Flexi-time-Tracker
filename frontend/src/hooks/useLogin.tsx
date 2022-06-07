@@ -14,7 +14,7 @@ function Login() {
 	const signIn = () =>
 		wallet?.requestSignIn({
 			contractId: "sam4.testnet",
-			methodNames: ["claim_flexi_time", "log_flexi_time", "get_flexi_time", "get_remaining_hours_in_epoch"],
+			methodNames: ["claim_flexi_time", "log_flexi_time", "get_flexi_time", "get_remaining_loggable_time_in_epoch"],
 		});
 
 	const signOut = () => {

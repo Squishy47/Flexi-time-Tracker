@@ -5,23 +5,22 @@ use near_sdk::{env, near_bindgen, log,PanicOnDefault};
 
 near_sdk::setup_alloc!();
 
-// TODO: make it so can log sub-divisions of an hour. minute resolution??
 // TODO: build interface to log time based on start and end time so i don't have to work it out.
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct FlexiTracker {
-    flexi_time_per_epoch: i8,
+    flexi_time_per_epoch: i32,
     users_tokens: HashMap<AccountId, FlexiTime>,
     users_authorized_viewers: HashMap<AccountId, Vec<AccountId>>,
 }
 
 #[derive(Default, BorshDeserialize, BorshSerialize)]
 pub struct FlexiTime {
-    // don't decrement hours per epoch as users could game system by sending hours to a friend, then logging more time. then sending hour back. 
-    logged_this_epoch: i8,
+    // don't decrement minutes per epoch as users could game system by sending minutes to a friend, then logging more time. then sending hour back. 
+    logged_this_epoch: i32,
     epoch: u64,
-    total_tokens: i8
+    total_tokens: i32
 }
 
 #[near_bindgen]
@@ -30,61 +29,61 @@ impl FlexiTracker {
     #[init]
     pub fn new() -> Self {
         Self {
-            flexi_time_per_epoch: 6,
+            flexi_time_per_epoch: 360,
             users_tokens: HashMap::new(),
             users_authorized_viewers: HashMap::new(),
         }
     }
 
-    pub fn claim_flexi_time(&mut self, hours: i8) {
+    pub fn claim_flexi_time(&mut self, minutes: i32) {
         let user_tokens = self.users_tokens.entry(env::signer_account_id()).or_default();
         
-        if hours > user_tokens.total_tokens {
-            log!("You can not claim more hours than you have.");
+        if minutes > user_tokens.total_tokens {
+            log!("You can not claim more minutes than you have.");
             return;
         }
         
-        user_tokens.total_tokens -= hours;
+        user_tokens.total_tokens -= minutes;
     }
 
-    pub fn log_flexi_time(&mut self, hours: i8) {
+    pub fn log_flexi_time(&mut self, minutes: i32) {
         let user_tokens = self.users_tokens.entry(env::signer_account_id()).or_default();
         
         let mut new_time = FlexiTime{
-            logged_this_epoch: user_tokens.logged_this_epoch + hours,
+            logged_this_epoch: user_tokens.logged_this_epoch + minutes,
             epoch: env::epoch_height(),
-            total_tokens: user_tokens.total_tokens + hours
+            total_tokens: user_tokens.total_tokens + minutes
         };
 
         if user_tokens.epoch == env::epoch_height() {
-            if self.flexi_time_per_epoch - user_tokens.logged_this_epoch - hours >= 0 {
+            if self.flexi_time_per_epoch - user_tokens.logged_this_epoch - minutes >= 0 {
                 self.users_tokens.insert(env::signer_account_id(), new_time);
                 return;
             }
         
-            log!("You can't log more than {} hours per epoch", self.flexi_time_per_epoch);
+            log!("You can't log more than {} minutes per epoch", self.flexi_time_per_epoch);
             return;
         }
 
         if env::epoch_height() > user_tokens.epoch {
-            new_time.logged_this_epoch = hours;
+            new_time.logged_this_epoch = minutes;
             self.users_tokens.insert(env::signer_account_id(), new_time);
             return;
         }
-
     }
 
-    pub fn get_flexi_time(&self, account_id: AccountId) -> i8 {
-        return self.users_tokens.get(&account_id).unwrap().total_tokens;
+    pub fn get_flexi_time(&self, account_id: AccountId) -> i32 {
+        match self.users_tokens.get(&account_id) {
+            Some(total_tokens) => return total_tokens.total_tokens,
+            None => return 0
+        }
     }
     
-    pub fn get_remaining_loggable_hours_in_epoch(&self, account_id: AccountId) -> i8 {
+    pub fn get_remaining_loggable_time_in_epoch(&self, account_id: AccountId) -> i32 {
         // get users tokens
-        let some_user_tokens = self.users_tokens.get(&account_id);
-
-        match some_user_tokens {
+        match self.users_tokens.get(&account_id) {
             Some(user_tokens) => {
-                // if we're still in current epoch, return remaining hours user can log in this epoch
+                // if we're still in current epoch, return remaining minutes user can log in this epoch
                 if user_tokens.epoch == env::epoch_height() {
                     return self.flexi_time_per_epoch - user_tokens.logged_this_epoch;
                 }
@@ -126,7 +125,7 @@ mod tests {
         }
     }
 
-    fn get_users_tokens (mut contract: FlexiTracker, user: AccountId) -> i8 {
+    fn get_users_tokens (mut contract: FlexiTracker, user: AccountId) -> i32 {
         return contract.users_tokens.entry(user).or_default().total_tokens;
     }
 
@@ -155,14 +154,21 @@ mod tests {
         let mut contract = setup_test_env();
         
         // log roberts flexi-time
-
         contract.log_flexi_time(3);
-
 
         // try to get roberts flexi-time as sam
         let roberts_flexi_time = contract.get_flexi_time(String::from("robert.testnet"));
 
         assert_eq!(roberts_flexi_time, 3);
+    }
+
+    #[test]
+    fn viewing_total_tokens_before_log_is_0(){
+        let contract = setup_test_env();
+
+        let roberts_flexi_time = contract.get_flexi_time(String::from("robert.testnet"));
+
+        assert_eq!(roberts_flexi_time, 0);
     }
 
     #[test]
@@ -204,7 +210,7 @@ mod tests {
     #[test]
     fn get_remaining_hours_in_epoch(){
         let contract = setup_test_env();
-        let remaining_hours = contract.get_remaining_loggable_hours_in_epoch(String::from("robert.testnet"));
+        let remaining_hours = contract.get_remaining_loggable_time_in_epoch(String::from("robert.testnet"));
         assert_eq!(remaining_hours, 12);
     }
 
@@ -222,7 +228,4 @@ mod tests {
     }
 }
 
-
 // TODO: user needs to be able to transfer tokens to other users - same as claiming the time off. or burn the tokens.
-
-

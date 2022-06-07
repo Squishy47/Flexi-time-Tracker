@@ -1,4 +1,4 @@
-import { Typography } from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import { useEffect } from "react";
 import { Routes, Route } from "react-router";
 import { BrowserRouter } from "react-router-dom";
@@ -12,11 +12,7 @@ import { useLogin } from "./hooks/useLogin";
 import Settings from "./pages/Settings";
 
 export default function App() {
-	const { isSignedIn } = useLogin();
-
-	useEffect(() => {
-		console.log(isSignedIn);
-	}, [isSignedIn]);
+	const { isSignedIn, signIn } = useLogin();
 
 	return (
 		<div className="App">
@@ -30,9 +26,9 @@ export default function App() {
 						<CurrentFlexiTime />
 					</div>
 				) : (
-					<Typography variant="h5" component="h5">
-						<div>Connect NEAR wallet to track flexi-time</div>
-					</Typography>
+					<Button onClick={signIn} variant="contained" style={{ margin: 20 }}>
+						Connect NEAR wallet
+					</Button>
 				)}
 			</div>
 		</div>

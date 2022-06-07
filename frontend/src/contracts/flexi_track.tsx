@@ -10,7 +10,7 @@ export interface ContractDetails {
 const FlexiTrack: ContractDetails = {
 	title: "FlexiTrack",
 	account: "sam4.testnet",
-	viewMethods: ["get_flexi_time", "get_remaining_loggable_hours_in_epoch"],
+	viewMethods: ["get_flexi_time", "get_remaining_loggable_time_in_epoch"],
 	changeMethods: ["claim_flexi_time", "log_flexi_time"],
 };
 
