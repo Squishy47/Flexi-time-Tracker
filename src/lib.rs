@@ -1,11 +1,10 @@
-use near_sdk::AccountId;
 use crate::borsh::maybestd::collections::HashMap;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, near_bindgen, log,PanicOnDefault};
+use near_sdk::{env, near_bindgen, log, PanicOnDefault, AccountId};
 
-near_sdk::setup_alloc!();
 
 // TODO: build interface to log time based on start and end time so i don't have to work it out.
+// TODO: deploy on mainnet and figure out how to deploy config in CI
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -44,6 +43,23 @@ impl FlexiTracker {
         }
         
         user_tokens.total_tokens -= minutes;
+    }
+
+    pub fn transfer_time(&mut self, minutes:i32, _receiver_account:AccountId){
+        // require!(sender_id != receiver_id, "Sender and receiver should be different");
+        // require!(amount > 0, "The amount should be a positive number");
+
+        let sender_account_balance = self.users_tokens.get(&env::signer_account_id());
+
+        if sender_account_balance.is_none() {
+            log!("You do not have any tokens.");
+            return;
+        }
+
+        if sender_account_balance.unwrap().total_tokens < minutes {
+            log!("You do not have enough tokens.");
+            return;
+        }
     }
 
     pub fn log_flexi_time(&mut self, minutes: i32) {
@@ -100,29 +116,17 @@ impl FlexiTracker {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use near_sdk::MockedBlockchain;
-    use near_sdk::{testing_env, VMContext};
 
-    fn get_context(input: Vec<u8>, is_view: bool) -> VMContext {
-        VMContext {
-            current_account_id: "alice.testnet".to_string(),
-            signer_account_id: "robert.testnet".to_string(),
-            signer_account_pk: vec![0, 1, 2],
-            predecessor_account_id: "jane.testnet".to_string(),
-            input,
-            block_index: 0,
-            block_timestamp: 0,
-            account_balance: 0,
-            account_locked_balance: 0,
-            storage_usage: 0,
-            attached_deposit: 0,
-            prepaid_gas: 10u64.pow(18),
-            random_seed: vec![0, 1, 2],
-            is_view,
-            output_data_receivers: vec![],
-            epoch_height: 19,
-        }
+    use super::*;
+    use near_sdk::{testing_env, VMContext};
+    use near_sdk::test_utils::{accounts, VMContextBuilder};
+
+    fn get_context(predecessor_account_id: AccountId) -> VMContext {
+        let mut builder = VMContextBuilder::new();
+
+        builder.current_account_id(accounts(0)).signer_account_id(predecessor_account_id.clone()).predecessor_account_id(predecessor_account_id);
+        
+        return builder.build();
     }
 
     fn get_users_tokens (mut contract: FlexiTracker, user: AccountId) -> i32 {
@@ -130,7 +134,7 @@ mod tests {
     }
 
     fn setup_test_env() -> FlexiTracker {
-        let context = get_context(vec![], false);
+        let context = get_context(accounts(1));
         testing_env!(context);
 
         let contract = FlexiTracker { flexi_time_per_epoch: 12, users_tokens: HashMap::new(),users_authorized_viewers: HashMap::new() };
@@ -144,7 +148,7 @@ mod tests {
 
         contract.log_flexi_time(1);
         
-        let total_tokens = get_users_tokens(contract, String::from("robert.testnet"));
+        let total_tokens = get_users_tokens(contract, accounts(1));
 
         assert_eq!(total_tokens, 1);
     }
@@ -157,7 +161,7 @@ mod tests {
         contract.log_flexi_time(3);
 
         // try to get roberts flexi-time as sam
-        let roberts_flexi_time = contract.get_flexi_time(String::from("robert.testnet"));
+        let roberts_flexi_time = contract.get_flexi_time(accounts(1));
 
         assert_eq!(roberts_flexi_time, 3);
     }
@@ -166,7 +170,7 @@ mod tests {
     fn viewing_total_tokens_before_log_is_0(){
         let contract = setup_test_env();
 
-        let roberts_flexi_time = contract.get_flexi_time(String::from("robert.testnet"));
+        let roberts_flexi_time = contract.get_flexi_time(accounts(1));
 
         assert_eq!(roberts_flexi_time, 0);
     }
@@ -178,10 +182,10 @@ mod tests {
         contract.log_flexi_time(12);
         contract.log_flexi_time(1);
 
-        let roberts_flexi_time = contract.get_flexi_time(String::from("robert.testnet"));
+        let roberts_flexi_time = contract.get_flexi_time(accounts(1));
 
         assert_eq!(roberts_flexi_time, 12);
-        assert_eq!(contract.users_tokens.entry(String::from("robert.testnet")).or_default().logged_this_epoch, 12);
+        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 12);
     }
 
     #[test]
@@ -191,26 +195,26 @@ mod tests {
         // log time in epoch 19
         contract.log_flexi_time(12);
 
-        assert_eq!(contract.users_tokens.entry(String::from("robert.testnet")).or_default().logged_this_epoch, 12);
+        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 12);
 
         // switch context to epoch 20
-        let mut context2 = get_context(vec![], false);
+        let mut context2 = get_context(accounts(1));
         context2.epoch_height = 20;
         testing_env!(context2);
 
         // log time in epoch 20
         contract.log_flexi_time(1);
 
-        let roberts_flexi_time = contract.get_flexi_time(String::from("robert.testnet"));
+        let roberts_flexi_time = contract.get_flexi_time(accounts(1));
 
         assert_eq!(roberts_flexi_time, 13);
-        assert_eq!(contract.users_tokens.entry(String::from("robert.testnet")).or_default().logged_this_epoch, 1);
+        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 1);
     }
 
     #[test]
     fn get_remaining_hours_in_epoch(){
         let contract = setup_test_env();
-        let remaining_hours = contract.get_remaining_loggable_time_in_epoch(String::from("robert.testnet"));
+        let remaining_hours = contract.get_remaining_loggable_time_in_epoch(accounts(1));
         assert_eq!(remaining_hours, 12);
     }
 
@@ -222,7 +226,7 @@ mod tests {
 
         contract.claim_flexi_time(7);
 
-        let tokens = get_users_tokens(contract, String::from("robert.testnet"));
+        let tokens = get_users_tokens(contract, accounts(1));
 
         assert_eq!(tokens, 5);
     }
