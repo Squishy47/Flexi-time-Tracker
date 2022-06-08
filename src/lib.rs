@@ -1,10 +1,11 @@
 use crate::borsh::maybestd::collections::HashMap;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, near_bindgen, log, PanicOnDefault, AccountId};
-
+use near_sdk::{env, near_bindgen, PanicOnDefault, AccountId, require};
+use near_contract_standards::fungible_token::FungibleToken;
 
 // TODO: build interface to log time based on start and end time so i don't have to work it out.
 // TODO: deploy on mainnet and figure out how to deploy config in CI
+// TODO: check numbers don't overflow types
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -35,36 +36,40 @@ impl FlexiTracker {
     }
 
     pub fn claim_flexi_time(&mut self, minutes: i32) {
+        require!(minutes > 0, "The amount should be a positive number");
+
         let user_tokens = self.users_tokens.entry(env::signer_account_id()).or_default();
-        
-        if minutes > user_tokens.total_tokens {
-            log!("You can not claim more minutes than you have.");
-            return;
-        }
-        
+
+        require!(minutes <= user_tokens.total_tokens, "You can not claim more minutes than you have.");
+
         user_tokens.total_tokens -= minutes;
     }
 
-    pub fn transfer_time(&mut self, minutes:i32, _receiver_account:AccountId){
-        // require!(sender_id != receiver_id, "Sender and receiver should be different");
-        // require!(amount > 0, "The amount should be a positive number");
+    pub fn transfer_time(&mut self, minutes: i32, receiver_id:AccountId){
 
-        let sender_account_balance = self.users_tokens.get(&env::signer_account_id());
+        let sender_id = env::signer_account_id();
 
-        if sender_account_balance.is_none() {
-            log!("You do not have any tokens.");
-            return;
-        }
+        require!(sender_id != receiver_id, "Sender and receiver should be different");
+        require!(minutes > 0, "The amount should be a positive number");
 
-        if sender_account_balance.unwrap().total_tokens < minutes {
-            log!("You do not have enough tokens.");
-            return;
-        }
+        let sender_balance = self.users_tokens.get(&env::signer_account_id()).unwrap();
+        let receiver_balance = self.users_tokens.get(&receiver_id).unwrap();
+        
+        require!(sender_balance.total_tokens >= minutes, "You do not have enough tokens.");
+        require!(receiver_balance.total_tokens.checked_add(minutes).is_some(), "The receiver does not have enough tokens.");
+        
+        // sender_balance.total_tokens -= minutes;
+
+        // self.users_tokens.insert(sender_id, sender_balance);
     }
 
     pub fn log_flexi_time(&mut self, minutes: i32) {
+        require!(minutes > 0, "The amount should be a positive number");
+
         let user_tokens = self.users_tokens.entry(env::signer_account_id()).or_default();
         
+        require!(user_tokens.total_tokens.checked_add(minutes).is_some(), "you've exceeded the max value, flexi-time is completed, well done.");
+
         let mut new_time = FlexiTime{
             logged_this_epoch: user_tokens.logged_this_epoch + minutes,
             epoch: env::epoch_height(),
@@ -72,19 +77,13 @@ impl FlexiTracker {
         };
 
         if user_tokens.epoch == env::epoch_height() {
-            if self.flexi_time_per_epoch - user_tokens.logged_this_epoch - minutes >= 0 {
-                self.users_tokens.insert(env::signer_account_id(), new_time);
-                return;
-            }
-        
-            log!("You can't log more than {} minutes per epoch", self.flexi_time_per_epoch);
-            return;
-        }
+            require!(self.flexi_time_per_epoch - user_tokens.logged_this_epoch - minutes > 0 , "You can't log more than {} minutes per epoch");
 
-        if env::epoch_height() > user_tokens.epoch {
+            self.users_tokens.insert(env::signer_account_id(), new_time);
+        }
+        else if env::epoch_height() > user_tokens.epoch {
             new_time.logged_this_epoch = minutes;
             self.users_tokens.insert(env::signer_account_id(), new_time);
-            return;
         }
     }
 
@@ -129,8 +128,8 @@ mod tests {
         return builder.build();
     }
 
-    fn get_users_tokens (mut contract: FlexiTracker, user: AccountId) -> i32 {
-        return contract.users_tokens.entry(user).or_default().total_tokens;
+    fn get_users_tokens (contract: FlexiTracker, user: AccountId) -> i32 {
+        return contract.users_tokens.get(&user).unwrap().total_tokens;
     }
 
     fn setup_test_env() -> FlexiTracker {
@@ -147,8 +146,8 @@ mod tests {
         let mut contract = setup_test_env();
 
         contract.log_flexi_time(1);
-        
-        let total_tokens = get_users_tokens(contract, accounts(1));
+
+        let total_tokens = contract.users_tokens.get(&accounts(1)).unwrap().total_tokens;
 
         assert_eq!(total_tokens, 1);
     }
@@ -176,16 +175,17 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn can_not_log_more_than_time_limit(){
         let mut contract = setup_test_env();
 
-        contract.log_flexi_time(12);
+        contract.log_flexi_time(6);
         contract.log_flexi_time(1);
 
         let roberts_flexi_time = contract.get_flexi_time(accounts(1));
 
-        assert_eq!(roberts_flexi_time, 12);
-        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 12);
+        assert_eq!(roberts_flexi_time, 6);
+        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 6);
     }
 
     #[test]
@@ -193,9 +193,9 @@ mod tests {
         let mut contract = setup_test_env();
 
         // log time in epoch 19
-        contract.log_flexi_time(12);
+        contract.log_flexi_time(6);
 
-        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 12);
+        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 6);
 
         // switch context to epoch 20
         let mut context2 = get_context(accounts(1));
@@ -205,10 +205,10 @@ mod tests {
         // log time in epoch 20
         contract.log_flexi_time(1);
 
-        let roberts_flexi_time = contract.get_flexi_time(accounts(1));
+        let roberts_data = contract.users_tokens.get(&accounts(1)).unwrap();
 
-        assert_eq!(roberts_flexi_time, 13);
-        assert_eq!(contract.users_tokens.entry(accounts(1)).or_default().logged_this_epoch, 1);
+        assert_eq!(roberts_data.total_tokens, 7);
+        assert_eq!(roberts_data.logged_this_epoch, 1);
     }
 
     #[test]
@@ -222,14 +222,55 @@ mod tests {
     fn claim_flexi_time(){
         let mut contract = setup_test_env();
 
-        contract.log_flexi_time(12);
+        contract.log_flexi_time(6);
 
-        contract.claim_flexi_time(7);
+        contract.claim_flexi_time(4);
 
         let tokens = get_users_tokens(contract, accounts(1));
 
-        assert_eq!(tokens, 5);
+        assert_eq!(tokens, 2);
     }
+
+    #[test]
+    #[should_panic]
+    fn cannot_claim_more_than_remaining_time(){
+        let mut contract = setup_test_env();
+
+        contract.log_flexi_time(6);
+        contract.claim_flexi_time(7);
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_log_negative_time(){
+        let mut contract = setup_test_env();
+
+        contract.log_flexi_time(-1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_claim_negative_time(){
+        let mut contract = setup_test_env();
+
+        contract.claim_flexi_time(-1);
+    }
+
+    #[test]
+    fn can_transfer_time_to_another_user(){
+        
+    }
+    
+    #[test]
+    fn cannot_transfer_more_time_than_have_to_another_user(){
+        
+    }
+
+    #[test]
+    fn cannot_transfer_negative_time_to_another_user(){
+        
+    }
+
 }
 
 // TODO: user needs to be able to transfer tokens to other users - same as claiming the time off. or burn the tokens.
