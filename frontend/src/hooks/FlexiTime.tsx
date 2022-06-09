@@ -2,19 +2,24 @@ import { useEffect, useState } from "react";
 import { singletonHook } from "react-singleton-hook";
 import { useFlexiTimeContract } from "./useFlexiTimeContract";
 
+import { utils } from "near-api-js";
+import useWallet from "./useWallet";
+
 function FlexiTime() {
 	const [flexiTime, setFlexiTime] = useState(0);
 	const [remainingHours, setRemainingHours] = useState(0);
 	const [loading, setLoading] = useState(false);
+	const wallet = useWallet();
 
 	const contract = useFlexiTimeContract();
 
 	const get_flexi_time = async () => {
 		setLoading(true);
+		console.log(wallet?.getAccountId());
 		setFlexiTime(
 			// @ts-ignore
 			await contract?.get_flexi_time({
-				account_id: "sam4.testnet",
+				account_id: wallet?.getAccountId(),
 			})
 		);
 		setLoading(false);
@@ -26,7 +31,7 @@ function FlexiTime() {
 		setRemainingHours(
 			// @ts-ignore
 			await contract?.get_remaining_loggable_time_in_epoch({
-				account_id: "sam4.testnet",
+				account_id: wallet?.getAccountId(),
 			})
 		);
 		setLoading(false);
@@ -39,6 +44,8 @@ function FlexiTime() {
 			args: {
 				minutes: val,
 			},
+
+			amount: utils.format.parseNearAmount("0.001"), // attached deposit in yoctoNEAR (optional)
 		});
 		get_flexi_time();
 		get_remaining_loggable_time_in_epoch();
@@ -59,7 +66,7 @@ function FlexiTime() {
 	useEffect(() => {
 		get_flexi_time();
 		get_remaining_loggable_time_in_epoch();
-	}, [contract]);
+	}, [contract, wallet]);
 
 	return {
 		flexiTime: flexiTime,
