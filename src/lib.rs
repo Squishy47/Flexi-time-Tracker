@@ -40,17 +40,12 @@ impl FlexiTracker {
 
     #[private] // not callable from other contracts
     fn get_user_data(&self, account_id: &AccountId) -> FlexiTime {
-        return self.users_tokens.get(account_id).expect("account not registered with contract");
+        return self.users_tokens.get(account_id).unwrap_or_default();
     }
 
     #[private] // not callable from other contracts
     fn write_data_to_user(&mut self, account_id: &AccountId, data: &FlexiTime) {
         self.users_tokens.insert(account_id, data);
-    }
-
-    // this is to stop people nuking their time by sending to an unregistered account.
-    pub fn register_account(&mut self, account_id: AccountId) {
-        self.write_data_to_user(&account_id, &FlexiTime::default());
     }
 
     pub fn claim_flexi_time(&mut self, minutes: i32) {
@@ -70,6 +65,8 @@ impl FlexiTracker {
 
         // check sending to another account
         require!(*sender_id != receiver_id, "Sender and receiver should be different");
+
+        require!(self.users_tokens.contains_key(&receiver_id), "reciever account not interacted with contract yet. please register first to avoid nuking your time.");
 
         // check amount is positive.
         require!(minutes > 0, "The amount should be a positive number");
@@ -159,7 +156,6 @@ mod tests {
     fn log_flexi_time() {      
         let mut contract = setup_test_env();
         
-        contract.register_account(accounts(1));
         contract.log_flexi_time(1);
 
         let total_tokens = contract.users_tokens.get(&accounts(1)).unwrap().total_tokens;
@@ -171,7 +167,6 @@ mod tests {
     fn can_view_flexi_time(){
         let mut contract = setup_test_env();
         
-        contract.register_account(accounts(1));
         // log roberts flexi-time
         contract.log_flexi_time(3);
 
@@ -183,9 +178,7 @@ mod tests {
 
     #[test]
     fn viewing_total_tokens_before_log_is_0(){
-        let mut contract = setup_test_env();
-
-        contract.register_account(accounts(1));
+        let contract = setup_test_env();
 
         let roberts_flexi_time = contract.get_flexi_time(accounts(1));
 
@@ -210,7 +203,6 @@ mod tests {
     fn can_log_after_epoch_change(){
         let mut contract = setup_test_env();
 
-        contract.register_account(accounts(1));
         // log time in epoch 19
         contract.log_flexi_time(6);
 
@@ -232,9 +224,7 @@ mod tests {
 
     #[test]
     fn get_remaining_hours_in_epoch(){
-        let mut contract = setup_test_env();
-
-        contract.register_account(accounts(1));
+        let contract = setup_test_env();
 
         let remaining_hours = contract.get_remaining_loggable_time_in_epoch(accounts(1));
         assert_eq!(remaining_hours, 12);
@@ -244,10 +234,7 @@ mod tests {
     fn claim_flexi_time(){
         let mut contract = setup_test_env();
 
-        contract.register_account(accounts(1));
-
         contract.log_flexi_time(6);
-
         contract.claim_flexi_time(4);
 
         let tokens = get_users_tokens(contract, accounts(1));
@@ -284,13 +271,19 @@ mod tests {
     fn can_transfer_time_to_another_user(){
         let mut contract = setup_test_env();
 
-        contract.register_account(accounts(1));
+        let context2 = get_context(accounts(2));
+        testing_env!(context2);
+
+        contract.log_flexi_time(1);
+
+        let context2 = get_context(accounts(1));
+        testing_env!(context2);
+
         contract.log_flexi_time(6);
-        contract.register_account(accounts(2));
         contract.transfer_flexi_time(4, accounts(2));
 
         assert_eq!(contract.get_user_data(&accounts(1)).total_tokens, 2);
-        assert_eq!(contract.get_user_data(&accounts(2)).total_tokens, 4);
+        assert_eq!(contract.get_user_data(&accounts(2)).total_tokens, 5);
     }
     
     #[test]
@@ -299,7 +292,6 @@ mod tests {
         let mut contract = setup_test_env();
 
         contract.log_flexi_time(6);
-        contract.register_account(accounts(2));
         contract.transfer_flexi_time(7, accounts(2));
     }
 
@@ -309,7 +301,6 @@ mod tests {
         let mut contract = setup_test_env();
 
         contract.log_flexi_time(6);
-        contract.register_account(accounts(2));
         contract.transfer_flexi_time(-1, accounts(2));
     }
 
@@ -321,6 +312,7 @@ mod tests {
         contract.log_flexi_time(6);
         contract.transfer_flexi_time(2, accounts(2));
     }
+  
 }
 
 // TODO: user needs to be able to transfer tokens to other users - same as claiming the time off. or burn the tokens.
