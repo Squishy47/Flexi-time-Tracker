@@ -1,3 +1,4 @@
+use near_sdk::ONE_NEAR;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, near_bindgen, PanicOnDefault, AccountId, require, BorshStorageKey};
 use near_sdk::collections::LookupMap;
@@ -91,6 +92,8 @@ impl FlexiTracker {
     pub fn log_flexi_time(&mut self, minutes: i32) {
         require!(minutes > 0, "The amount should be a positive number");
 
+        require!(env::attached_deposit() == ONE_NEAR / 1000, "insufficient deposit attached. please deposit 1/1000 near");
+
         let user_tokens = self.get_user_data(&env::signer_account_id());
         
         require!(user_tokens.total_tokens.checked_add(minutes).is_some(), "you've exceeded the max value, flexi-time is completed, well done.");
@@ -137,7 +140,7 @@ mod tests {
     fn get_context(predecessor_account_id: AccountId) -> VMContext {
         let mut builder = VMContextBuilder::new();
 
-        builder.current_account_id(accounts(0)).signer_account_id(predecessor_account_id.clone()).predecessor_account_id(predecessor_account_id);
+        builder.current_account_id(accounts(0)).signer_account_id(predecessor_account_id.clone()).predecessor_account_id(predecessor_account_id).attached_deposit(ONE_NEAR/1000);
         
         return builder.build();
     }
